@@ -1,7 +1,5 @@
 import logging
-import asyncio
 from mcp.server.fastmcp import FastMCP
-import json
 
 # Init server
 mcp = FastMCP("TaskManager")
@@ -9,10 +7,14 @@ mcp = FastMCP("TaskManager")
 # Init tasks list
 tasks = []
 
-# Logging config
+# ===== НАСТРОЙКА ЛОГИРОВАНИЯ =====
 logging.basicConfig(
-    level=logging.INFO,  # Изменено с DEBUG на INFO для production
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('mcp_server.log', encoding='utf-8')
+    ]
 )
 logger = logging.getLogger(__name__)
 

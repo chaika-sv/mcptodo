@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pdb
+*.egg-info/
+*.log
+
+# Virtualenv
+venv/
+.venv/
+
+# Environment variables
+.env
+
+# IDE
+.idea/
+.vscode/
+*.iml
+workspace.xml
+
+# Caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
