@@ -24,3 +24,8 @@ workspace.xml
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# SQLite database
+*.sqlite3
+*.sqlite
+*.db
