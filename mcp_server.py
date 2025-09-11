@@ -101,6 +101,172 @@ def list_tasks():
 
 
 @mcp.tool()
+def search_tasks(query: str):
+    """Search tasks by title or description"""
+    try:
+        if not query or not query.strip():
+            logger.warning("Empty search query provided")
+            return {"status": "error", "message": "Search query cannot be empty"}
+
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            # Поиск по title и description (case-insensitive)
+            search_pattern = f"%{query.strip()}%"
+            cursor.execute("""
+                SELECT t.*, p.name as priority_name, c.name as category_name, s.name as status_name
+                FROM tasks t
+                LEFT JOIN priorities p ON t.priority_id = p.id
+                LEFT JOIN categories c ON t.category_id = c.id  
+                LEFT JOIN statuses s ON t.status_id = s.id
+                WHERE LOWER(t.title) LIKE LOWER(?) OR LOWER(t.description) LIKE LOWER(?)
+                ORDER BY t.id
+            """, (search_pattern, search_pattern))
+
+            rows = cursor.fetchall()
+            tasks = []
+            for row in rows:
+                task = dict(row)
+                # Добавляем читаемые названия
+                task['priority'] = task['priority_name']
+                task['category'] = task['category_name']
+                task['status'] = task['status_name']
+                tasks.append(task)
+
+            logger.info(f"Search query '{query}': found {len(tasks)} tasks")
+            return {
+                "status": "success",
+                "tasks": tasks,
+                "count": len(tasks),
+                "query": query.strip()
+            }
+
+    except Exception as e:
+        logger.error(f"Error searching tasks: {e}")
+        return {"status": "error", "message": "Failed to search tasks"}
+
+
+@mcp.tool()
+def edit_task(search_query: str, title: str = None, description: str = None,
+              priority: str = None, category: str = None, status: str = None, due_date: str = None):
+    """Edit task by search query. If multiple tasks found, returns list for clarification."""
+    try:
+        if not search_query or not search_query.strip():
+            return {"status": "error", "message": "Search query cannot be empty"}
+
+        # Сначала ищем задачи
+        search_result = search_tasks(search_query.strip())
+        if search_result["status"] != "success":
+            return search_result
+
+        found_tasks = search_result["tasks"]
+
+        # Если задач не найдено
+        if len(found_tasks) == 0:
+            return {
+                "status": "error",
+                "message": f"No tasks found matching '{search_query}'"
+            }
+
+        # Если найдено несколько задач - просим уточнить
+        if len(found_tasks) > 1:
+            return {
+                "status": "multiple_found",
+                "message": f"Found {len(found_tasks)} tasks matching '{search_query}'. Please be more specific.",
+                "tasks": found_tasks,
+                "count": len(found_tasks)
+            }
+
+        # Найдена одна задача - редактируем
+        task_to_edit = found_tasks[0]
+        task_id = task_to_edit['id']
+
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            updates = []
+            params = []
+
+            # Подготавливаем обновления
+            if title is not None:
+                updates.append("title = ?")
+                params.append(title.strip())
+
+            if description is not None:
+                updates.append("description = ?")
+                params.append(description.strip() if description.strip() else None)
+
+            # Для priority, category, status нужно найти ID по имени
+            if priority is not None:
+                cursor.execute("SELECT id FROM priorities WHERE LOWER(name) = LOWER(?)", (priority.strip(),))
+                priority_row = cursor.fetchone()
+                if priority_row:
+                    updates.append("priority_id = ?")
+                    params.append(priority_row[0])
+                else:
+                    return {"status": "error", "message": f"Priority '{priority}' not found"}
+
+            if category is not None:
+                cursor.execute("SELECT id FROM categories WHERE LOWER(name) = LOWER(?)", (category.strip(),))
+                category_row = cursor.fetchone()
+                if category_row:
+                    updates.append("category_id = ?")
+                    params.append(category_row[0])
+                else:
+                    return {"status": "error", "message": f"Category '{category}' not found"}
+
+            if status is not None:
+                cursor.execute("SELECT id FROM statuses WHERE LOWER(name) = LOWER(?)", (status.strip(),))
+                status_row = cursor.fetchone()
+                if status_row:
+                    updates.append("status_id = ?")
+                    params.append(status_row[0])
+                else:
+                    return {"status": "error", "message": f"Status '{status}' not found"}
+
+            if due_date is not None:
+                updates.append("due_date = ?")
+                params.append(due_date.strip() if due_date.strip() else None)
+
+            # Если нет изменений
+            if not updates:
+                return {"status": "error", "message": "No fields to update provided"}
+
+            # Выполняем обновление
+            params.append(task_id)
+            update_query = f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?"
+            cursor.execute(update_query, params)
+
+            # Получаем обновленную задачу
+            cursor.execute("""
+                SELECT t.*, p.name as priority_name, c.name as category_name, s.name as status_name
+                FROM tasks t
+                LEFT JOIN priorities p ON t.priority_id = p.id
+                LEFT JOIN categories c ON t.category_id = c.id  
+                LEFT JOIN statuses s ON t.status_id = s.id
+                WHERE t.id = ?
+            """, (task_id,))
+
+            row = cursor.fetchone()
+            updated_task = dict(row)
+            updated_task['priority'] = updated_task['priority_name']
+            updated_task['category'] = updated_task['category_name']
+            updated_task['status'] = updated_task['status_name']
+
+            logger.info(f"Updated task {task_id}: '{updated_task['title']}'")
+            return {
+                "status": "success",
+                "message": f"Task '{updated_task['title']}' updated successfully",
+                "task": updated_task
+            }
+
+    except Exception as e:
+        logger.error(f"Error editing task: {e}")
+        return {"status": "error", "message": "Failed to edit task"}
+
+
+
+@mcp.tool()
 def delete_task(id: int):
     """Delete task by ID"""
     try:

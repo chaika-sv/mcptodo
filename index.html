@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Task Manager</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        #chatBox { border:1px solid #ccc; padding:10px; height:300px; overflow-y:auto; background:#f9f9f9; margin-bottom:10px; }
+        #chatInput { width: 80%; padding: 6px; }
+        button { padding: 6px 10px; }
+    </style>
+</head>
+<body>
+    <h1>Task Manager</h1>
+
+    <h2>Tasks</h2>
+    <table id="tasksTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Title</th>
+                <th>Description</th>
+                <th>Due Date</th>
+                <th>Priority</th>
+                <th>Category</th>
+                <th>Status</th>
+                <th>Created At</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <h2>AI Chat</h2>
+    <div id="chatBox"></div>
+    <input type="text" id="chatInput" placeholder="Type your message here">
+    <button onclick="sendMessage()">Send</button>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        // ===== Tasks table =====
+        async function loadTasks() {
+            try {
+                const response = await fetch("http://127.0.0.1:8000/tasks");
+                const tasks = await response.json();
+                const tbody = document.querySelector("#tasksTable tbody");
+                tbody.innerHTML = "";
+
+                tasks.forEach(task => {
+                    const row = document.createElement("tr");
+                    row.innerHTML = `
+                        <td>${task.id}</td>
+                        <td>${task.title}</td>
+                        <td>${task.description || ''}</td>
+                        <td>${task.due_date || ''}</td>
+                        <td>${task.priority || ''}</td>
+                        <td>${task.category || ''}</td>
+                        <td>${task.status || ''}</td>
+                        <td>${task.created_at || ''}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch (err) {
+                console.error("Error loading tasks:", err);
+            }
+        }
+
+        loadTasks();
+        setInterval(loadTasks, 5000);
+
+        // ===== Chat =====
+        const chatBox = document.getElementById("chatBox");
+        const chatInput = document.getElementById("chatInput");
+
+        async function sendMessage() {
+            const msg = chatInput.value.trim();
+            if (!msg) return;
+
+            appendMessage("You", msg);
+            chatInput.value = "";
+
+            try {
+                const response = await fetch("http://127.0.0.1:8000/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message: msg })
+                });
+                const data = await response.json();
+                appendMessage("AI", data.response);
+            } catch (err) {
+                appendMessage("AI", "Error connecting to server.");
+                console.error(err);
+            }
+        }
+
+        function appendMessage(sender, text) {
+            const p = document.createElement("p");
+            p.innerHTML = `<strong>${sender}:</strong> ${text}`;
+            chatBox.appendChild(p);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        chatInput.addEventListener("keypress", function(e) {
+            if (e.key === "Enter") sendMessage();
+        });
+    </script>
+</body>
+</html>
