@@ -221,7 +221,6 @@ class TaskManagerAgent:
     @retry_on_failure()
     async def _init_mcp_client(self):
         """Инициализация MCP клиента"""
-        logger.info("Инициализация MCP клиента...")
         self.mcp_client = MultiServerMCPClient(self.config.get_mcp_config())
         self.tools = await self.mcp_client.get_tools()
 

@@ -27,23 +27,49 @@ def get_db_connection():
 
 
 @mcp.tool()
-def add_task(title: str):
-    """Add task to list"""
+def add_task(
+    title: str,
+    description: str = None,
+    due_date: str = None,
+    priority_id: int = None,
+    category_id: int = None,
+    status_id: int = None,
+    started_at: str = None,
+    completed_at: str = None
+):
+    """Add task with full support of fields"""
     try:
-        # Валидация входных данных
         if not title or not title.strip():
             logger.warning("Attempted to add task with empty title")
             return {"status": "error", "message": "Task title cannot be empty"}
 
+        fields = ["title"]
+        values = [title.strip()]
+
+        # Опциональные поля
+        optional_fields = {
+            "description": description,
+            "due_date": due_date,
+            "priority_id": priority_id,
+            "category_id": category_id,
+            "status_id": status_id,
+            "started_at": started_at,
+            "completed_at": completed_at
+        }
+
+        for field, value in optional_fields.items():
+            if value is not None:
+                fields.append(field)
+                values.append(value)
+
+        placeholders = ", ".join("?" for _ in fields)
+        sql = f"INSERT INTO tasks ({', '.join(fields)}) VALUES ({placeholders})"
+
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO tasks (title) VALUES (?)",
-                (title.strip(),)
-            )
+            cursor.execute(sql, values)
             task_id = cursor.lastrowid
 
-            # Получаем созданную задачу
             cursor.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
             row = cursor.fetchone()
             task = dict(row)
@@ -58,11 +84,11 @@ def add_task(title: str):
 
 @mcp.tool()
 def list_tasks():
-    """Return all tasks"""
+    """Return all tasks with all fields"""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM tasks ORDER BY id")
+            cursor.execute("SELECT * FROM tasks ORDER BY created_at")
             rows = cursor.fetchall()
             tasks = [dict(row) for row in rows]
 
