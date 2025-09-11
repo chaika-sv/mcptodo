@@ -8,7 +8,101 @@
         table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
         th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
         th { background-color: #f2f2f2; }
-        #chatBox { border:1px solid #ccc; padding:10px; height:300px; overflow-y:auto; background:#f9f9f9; margin-bottom:10px; }
+
+        /* chat container */
+        #chatBox {
+            border: 1px solid #ccc;
+            padding: 8px;           /* меньше внутреннего отступа */
+            height: 300px;
+            overflow-y: auto;
+            background: #f9f9f9;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;               /* расстояние между строками чата */
+        }
+
+        /* каждая строка чата (аватар + пузырь) */
+        .chat-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin: 2px 0;          /* минимальный вертикальный отступ между строками */
+        }
+
+        /* направление для юзера / ai */
+        .chat-row.user { justify-content: flex-end; }
+        .chat-row.ai   { justify-content: flex-start; }
+
+        /* аватар */
+        .avatar {
+            font-size: 18px;
+            line-height: 1;
+            width: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* пузырь сообщения */
+        .msg {
+            max-width: 72%;
+            padding: 12px 10px;      /* чуть меньше padding, чем было */
+            border-radius: 10px;
+            white-space: pre-wrap;
+            box-sizing: border-box;
+            margin: 0;               /* важно: убрать внешние отступы у контейнера пузыря */
+            line-height: 1.0;       /* чуть плотнее */
+        }
+
+        /* цвета для юзера и ai */
+        .user .msg {
+            background: #e6e6e6;
+            text-align: right;
+        }
+
+        .ai .msg {
+            background: #ffffff;
+            border: 1px solid #eee;
+            text-align: left;
+        }
+
+        /* --- Сброс/подстройка внутренних отступов Markdown внутри пузыря --- */
+        /* Убираем большие дефолтные margin у параграфов и заголовков внутри пузыря */
+        .msg p {
+            margin: 0 0 6px 0;       /* нижний отступ между параграфами */
+        }
+        .msg h1, .msg h2, .msg h3 {
+            margin: 0 0 6px 0;
+            font-weight: 600;
+            line-height: 1.2;
+        }
+
+        /* списки - уменьшаем margin и делаем отступ слева аккуратнее */
+        .msg ul, .msg ol {
+            margin: 6px 0 6px 1.1em;
+            padding-left: 0;
+        }
+        .msg li {
+            margin: 3px 0;
+        }
+
+        /* код-блоки и inline-код */
+        .msg pre {
+            margin: 0;
+            padding: 8px;
+            border-radius: 6px;
+            background: #f5f5f7;
+            overflow: auto;
+            font-size: 13px;
+        }
+        .msg code {
+            background: #f2f2f2;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+
         #chatInput { width: 80%; padding: 6px; }
         button { padding: 6px 10px; }
     </style>
@@ -78,7 +172,7 @@
             const msg = chatInput.value.trim();
             if (!msg) return;
 
-            appendMessage("You", msg);
+            appendMessage("user", msg);
             chatInput.value = "";
 
             try {
@@ -88,17 +182,34 @@
                     body: JSON.stringify({ message: msg })
                 });
                 const data = await response.json();
-                appendMessage("AI", data.response);
+                appendMessage("ai", data.response);
             } catch (err) {
-                appendMessage("AI", "Error connecting to server.");
+                appendMessage("ai", "Error connecting to server.");
                 console.error(err);
             }
         }
 
         function appendMessage(sender, text) {
-            const p = document.createElement("p");
-            p.innerHTML = `<strong>${sender}:</strong> ${text}`;
-            chatBox.appendChild(p);
+            const row = document.createElement("div");
+            row.classList.add("chat-row", sender);
+
+            const avatar = document.createElement("div");
+            avatar.classList.add("avatar");
+            avatar.textContent = sender === "user" ? "👤" : "🤖";
+
+            const msg = document.createElement("div");
+            msg.classList.add("msg");
+            msg.innerHTML = marked.parse(text);
+
+            if (sender === "user") {
+                row.appendChild(msg);
+                row.appendChild(avatar);
+            } else {
+                row.appendChild(avatar);
+                row.appendChild(msg);
+            }
+
+            chatBox.appendChild(row);
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
