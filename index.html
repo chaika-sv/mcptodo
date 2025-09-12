@@ -4,36 +4,95 @@
     <meta charset="UTF-8">
     <title>Task Manager</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-
-        /* chat container */
-        #chatBox {
-            border: 1px solid #ccc;
-            padding: 8px;           /* меньше внутреннего отступа */
-            height: 300px;
-            overflow-y: auto;
-            background: #f9f9f9;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;               /* расстояние между строками чата */
+        /* общая вёрстка страницы */
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* убираем лишний скролл */
         }
 
-        /* каждая строка чата (аватар + пузырь) */
+        body {
+            font-family: Arial, sans-serif;
+            box-sizing: border-box;
+            height: 100vh; /* жёстко фиксируем под окно */
+        }
+
+        /* главный контейнер */
+        .app {
+            display: flex;
+            flex-direction: column;
+            height: 100%; /* строго по высоте body */
+            gap: 12px;
+            box-sizing: border-box;
+            padding: 20px; /* оставляем внутренние отступы */
+        }
+
+        .pane { display: flex; flex-direction: column; gap: 8px; }
+
+        /* Tasks — занимает 2 части из 3 */
+        .tasks-pane {
+            flex: 2;
+            min-height: 0; /* обязательно, чтобы overflow работал корректно в flex-контейнерах */
+        }
+        .tasks-container {
+            flex: 1;              /* контейнер таблицы растёт внутри pane */
+            overflow: auto;       /* вертикальный скролл при переполнении */
+            border: 1px solid #e0e0e0;
+            padding: 8px;
+            background: #fff;
+            box-sizing: border-box;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: left;
+        }
+        th { background-color: #f2f2f2; position: relative; }
+
+        /* Chat — занимает 1 часть из 3, приклеен к низу */
+        .chat-pane {
+            flex: 1;
+            min-height: 0; /* важно для корректной работы overflow внутри */
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-inner {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            border: 1px solid #e0e0e0;
+            background: #fafafa;
+            padding: 8px;
+            box-sizing: border-box;
+            overflow: hidden; /* чтобы контент не вылазил */
+        }
+
+        /* сообщения и область сообщений */
+        #chatBox {
+            flex: 1;
+            overflow-y: auto;  /* скроллим только сообщения */
+            min-height: 0;     /* важно, чтобы flex корректно сжимал */
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding: 6px;
+        }
+
         .chat-row {
             display: flex;
             align-items: flex-start;
             gap: 8px;
-            margin: 2px 0;          /* минимальный вертикальный отступ между строками */
+            margin: 0;             /* минимальный внешний отступ, управляем через gap у #chatBox */
         }
 
-        /* направление для юзера / ai */
         .chat-row.user { justify-content: flex-end; }
         .chat-row.ai   { justify-content: flex-start; }
 
-        /* аватар */
         .avatar {
             font-size: 18px;
             line-height: 1;
@@ -41,104 +100,103 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            flex-shrink: 0;
         }
 
-        /* пузырь сообщения */
         .msg {
             max-width: 72%;
-            padding: 12px 10px;      /* чуть меньше padding, чем было */
+            padding: 10px;
             border-radius: 10px;
             white-space: pre-wrap;
             box-sizing: border-box;
-            margin: 0;               /* важно: убрать внешние отступы у контейнера пузыря */
-            line-height: 1.0;       /* чуть плотнее */
+            margin: 0;
+            line-height: 1.2;
+            font-size: 14px;
         }
 
-        /* цвета для юзера и ai */
         .user .msg {
             background: #e6e6e6;
             text-align: right;
         }
-
         .ai .msg {
             background: #ffffff;
             border: 1px solid #eee;
             text-align: left;
         }
 
-        /* --- Сброс/подстройка внутренних отступов Markdown внутри пузыря --- */
-        /* Убираем большие дефолтные margin у параграфов и заголовков внутри пузыря */
-        .msg p {
-            margin: 0 0 6px 0;       /* нижний отступ между параграфами */
-        }
-        .msg h1, .msg h2, .msg h3 {
-            margin: 0 0 6px 0;
-            font-weight: 600;
-            line-height: 1.2;
-        }
+        /* уменьшение отступов внутри Markdown-рендера */
+        .msg p { margin: 0 0 6px 0; }
+        .msg h1, .msg h2, .msg h3 { margin: 0 0 6px 0; line-height: 1.2; }
+        .msg ul, .msg ol { margin: 6px 0 6px 1.1em; padding-left: 0; }
+        .msg li { margin: 3px 0; }
+        .msg pre { margin: 0; padding: 8px; border-radius: 6px; background: #f5f5f7; overflow: auto; font-size: 13px; }
+        .msg code { background: #f2f2f2; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
 
-        /* списки - уменьшаем margin и делаем отступ слева аккуратнее */
-        .msg ul, .msg ol {
-            margin: 6px 0 6px 1.1em;
-            padding-left: 0;
+        /* контролы ввода — остаются внизу chat-pane */
+        .chat-controls {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+            flex-shrink: 0;  /* чтобы панель ввода не схлопывалась */
         }
-        .msg li {
-            margin: 3px 0;
-        }
+        #chatInput { flex: 1; padding: 8px; font-size: 14px; }
+        #sendBtn { padding: 8px 12px; }
 
-        /* код-блоки и inline-код */
-        .msg pre {
-            margin: 0;
-            padding: 8px;
-            border-radius: 6px;
-            background: #f5f5f7;
-            overflow: auto;
+        /* индикатор "AI is typing" */
+        #typingIndicator {
+            font-style: italic;
+            color: #666;
             font-size: 13px;
-        }
-        .msg code {
-            background: #f2f2f2;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 13px;
+            margin: 4px 0;
+            padding-left: 32px; /* смещаем, чтобы было на месте аватарки 🤖 */
         }
 
-
-        #chatInput { width: 80%; padding: 6px; }
-        button { padding: 6px 10px; }
+        /* адаптивность: при узком экране уменьшаем ширину пузырей */
+        @media (max-width: 600px) {
+            .msg { max-width: 85%; }
+        }
     </style>
 </head>
 <body>
-    <h1>Task Manager</h1>
+    <div class="app">
+        <div class="pane tasks-pane">
+            <h1 style="margin:0;">Task Manager</h1>
+            <h2 style="margin:0 0 4px 0;">Tasks</h2>
 
-    <h2>Tasks</h2>
-    <table id="tasksTable">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Title</th>
-                <th>Description</th>
-                <th>Due Date</th>
-                <th>Priority</th>
-                <th>Category</th>
-                <th>Status</th>
-                <th>Created At</th>
-            </tr>
-        </thead>
-        <tbody></tbody>
-    </table>
+            <div class="tasks-container">
+                <table id="tasksTable" aria-label="tasks table">
+                    <thead>
+                        <tr>
+                            <th>ID</th><th>Title</th><th>Description</th><th>Due Date</th>
+                            <th>Priority</th><th>Category</th><th>Status</th><th>Created At</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
 
-    <h2>AI Chat</h2>
-    <div id="chatBox"></div>
-    <input type="text" id="chatInput" placeholder="Type your message here">
-    <button onclick="sendMessage()">Send</button>
+        <div class="pane chat-pane">
+            <h2 style="margin:0 0 6px 0;">AI Chat</h2>
+            <div class="chat-inner">
+                <div id="chatBox" aria-live="polite"></div>
+                <div id="typingIndicator" style="display:none;">🤖 AI is typing...</div>
+
+                <div class="chat-controls">
+                    <input id="chatInput" type="text" placeholder="Type your message here">
+                    <button id="sendBtn">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
         // ===== Tasks table =====
         async function loadTasks() {
             try {
-                const response = await fetch("http://127.0.0.1:8000/tasks");
-                const tasks = await response.json();
+                const res = await fetch("http://127.0.0.1:8000/tasks");
+                const tasks = await res.json();
                 const tbody = document.querySelector("#tasksTable tbody");
                 tbody.innerHTML = "";
 
@@ -146,8 +204,8 @@
                     const row = document.createElement("tr");
                     row.innerHTML = `
                         <td>${task.id}</td>
-                        <td>${task.title}</td>
-                        <td>${task.description || ''}</td>
+                        <td>${escapeHtml(task.title || '')}</td>
+                        <td>${escapeHtml(task.description || '')}</td>
                         <td>${task.due_date || ''}</td>
                         <td>${task.priority || ''}</td>
                         <td>${task.category || ''}</td>
@@ -157,8 +215,15 @@
                     tbody.appendChild(row);
                 });
             } catch (err) {
-                console.error("Error loading tasks:", err);
+                console.log("Error loading tasks:", err);
             }
+        }
+
+        // небольшой helper для защиты (на всякий случай)
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, function(m){
+                return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[m];
+            });
         }
 
         loadTasks();
@@ -167,6 +232,10 @@
         // ===== Chat =====
         const chatBox = document.getElementById("chatBox");
         const chatInput = document.getElementById("chatInput");
+        const sendBtn = document.getElementById("sendBtn");
+
+        sendBtn.addEventListener("click", sendMessage);
+        chatInput.addEventListener("keypress", function(e) { if (e.key === "Enter") sendMessage(); });
 
         async function sendMessage() {
             const msg = chatInput.value.trim();
@@ -175,6 +244,9 @@
             appendMessage("user", msg);
             chatInput.value = "";
 
+            // показать индикатор
+            document.getElementById("typingIndicator").style.display = "block";
+
             try {
                 const response = await fetch("http://127.0.0.1:8000/chat", {
                     method: "POST",
@@ -182,8 +254,13 @@
                     body: JSON.stringify({ message: msg })
                 });
                 const data = await response.json();
+
+                // скрыть индикатор
+                document.getElementById("typingIndicator").style.display = "none";
+
                 appendMessage("ai", data.response);
             } catch (err) {
+                document.getElementById("typingIndicator").style.display = "none";
                 appendMessage("ai", "Error connecting to server.");
                 console.error(err);
             }
@@ -210,12 +287,9 @@
             }
 
             chatBox.appendChild(row);
+            // прокручиваем в конец
             chatBox.scrollTop = chatBox.scrollHeight;
         }
-
-        chatInput.addEventListener("keypress", function(e) {
-            if (e.key === "Enter") sendMessage();
-        });
     </script>
 </body>
 </html>

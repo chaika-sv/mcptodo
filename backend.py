@@ -65,7 +65,7 @@ class ChatRequest(BaseModel):
     message: str
 
 # Инициализация агента при старте FastAPI
-agent_config = AgentConfig(model_provider=ModelProvider.DEEPSEEK)  # или deepseek
+agent_config = AgentConfig(model_provider=ModelProvider.OPENROUTER)  # или deepseek
 agent = TaskManagerAgent(agent_config)
 
 
