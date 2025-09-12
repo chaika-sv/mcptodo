@@ -2,6 +2,8 @@ import logging
 import sqlite3
 from mcp.server.fastmcp import FastMCP
 from setup import setup_database
+import dateparser
+import re
 
 # Init server
 mcp = FastMCP("TaskManager")
@@ -26,44 +28,104 @@ def get_db_connection():
     return conn
 
 
+
+
+logger = logging.getLogger(__name__)
+
+def parse_due_date(raw_due: str | None) -> str | None:
+    if not raw_due:
+        return None
+
+    text = raw_due.strip().lower()
+
+    # словарь для времён суток
+    time_overrides = {
+        "утром": (9, 0),
+        "днём": (13, 0),
+        "днем": (13, 0),  # без ё
+        "вечером": (18, 0),
+        "ночью": (23, 0),
+        "morning": (9, 0),
+        "afternoon": (13, 0),
+        "evening": (18, 0),
+        "night": (23, 0),
+    }
+
+    matched_time = None
+    for word, (h, m) in time_overrides.items():
+        if word in text:
+            matched_time = (h, m)
+            text = text.replace(word, "").strip()  # убираем слово, чтобы parser понял дату
+            break
+
+    parsed = dateparser.parse(
+        text,
+        languages=["ru", "en"],
+        settings={
+            "PREFER_DATES_FROM": "future",
+            "PREFER_DAY_OF_MONTH": "current",
+            "RETURN_AS_TIMEZONE_AWARE": False,
+        }
+    )
+
+    if not parsed:
+        logger.warning(f"Unrecognized due_date: {raw_due}")
+        return None
+
+    # если нашли время суток → подставляем его вручную
+    if matched_time:
+        parsed = parsed.replace(hour=matched_time[0], minute=matched_time[1])
+        return parsed.isoformat()
+
+    # проверяем, было ли во входе время явно
+    time_pattern = r"\b\d{1,2}[:.]\d{2}\b"
+    if re.search(time_pattern, raw_due):
+        return parsed.isoformat()
+
+    # иначе возвращаем только дату
+    return parsed.date().isoformat()
+
+
+
+
 @mcp.tool()
 def add_task(
     title: str,
-    description: str = None,
-    due_date: str = None,
-    priority_id: int = None,
-    category_id: int = None,
-    status_id: int = None,
-    started_at: str = None,
-    completed_at: str = None
-):
+    description: str | None = None,
+    due_date: str | None = None,
+    priority_id: int | None = None,
+    category_id: int | None = None,
+    status_id: int | None = None,
+    started_at: str | None = None,
+    completed_at: str | None = None
+) -> dict:
     """Add task with full support of fields"""
+
     try:
         if not title or not title.strip():
             logger.warning("Attempted to add task with empty title")
-            return {"status": "error", "message": "Task title cannot be empty"}
+            return {"status": "error", "error": "Task title cannot be empty"}
 
-        fields = ["title"]
-        values = [title.strip()]
-
-        # Опциональные поля
-        optional_fields = {
+        # обязательные и опциональные поля
+        data: dict[str, object] = {
+            "title": title.strip(),
             "description": description,
-            "due_date": due_date,
+            "due_date": parse_due_date(due_date),
             "priority_id": priority_id,
             "category_id": category_id,
             "status_id": status_id,
             "started_at": started_at,
-            "completed_at": completed_at
+            "completed_at": completed_at,
         }
 
-        for field, value in optional_fields.items():
-            if value is not None:
-                fields.append(field)
-                values.append(value)
+        # фильтруем None
+        data = {k: v for k, v in data.items() if v is not None}
 
-        placeholders = ", ".join("?" for _ in fields)
-        sql = f"INSERT INTO tasks ({', '.join(fields)}) VALUES ({placeholders})"
+        fields = ", ".join(data.keys())
+        placeholders = ", ".join("?" for _ in data)
+        values = list(data.values())
+
+        sql = f"INSERT INTO tasks ({fields}) VALUES ({placeholders})"
 
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -75,11 +137,11 @@ def add_task(
             task = dict(row)
 
             logger.info(f"Added task: {task['id']} - {task['title']}")
-            return {"status": "success", "task": task}
+            return {"status": "success", "data": task}
 
     except Exception as e:
         logger.error(f"Error adding task: {e}")
-        return {"status": "error", "message": "Failed to add task"}
+        return {"status": "error", "error": str(e)}
 
 
 @mcp.tool()

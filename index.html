@@ -4,40 +4,30 @@
     <meta charset="UTF-8">
     <title>Task Manager</title>
     <style>
-        /* общая вёрстка страницы */
         html, body {
             height: 100%;
             margin: 0;
             padding: 0;
-            overflow: hidden; /* убираем лишний скролл */
+            overflow: hidden;
         }
-
         body {
             font-family: Arial, sans-serif;
             box-sizing: border-box;
-            height: 100vh; /* жёстко фиксируем под окно */
+            height: 100vh;
         }
-
-        /* главный контейнер */
         .app {
             display: flex;
             flex-direction: column;
-            height: 100%; /* строго по высоте body */
+            height: 100%;
             gap: 12px;
+            padding: 20px;
             box-sizing: border-box;
-            padding: 20px; /* оставляем внутренние отступы */
         }
-
         .pane { display: flex; flex-direction: column; gap: 8px; }
-
-        /* Tasks — занимает 2 части из 3 */
-        .tasks-pane {
-            flex: 2;
-            min-height: 0; /* обязательно, чтобы overflow работал корректно в flex-контейнерах */
-        }
+        .tasks-pane { flex: 2; min-height: 0; }
         .tasks-container {
-            flex: 1;              /* контейнер таблицы растёт внутри pane */
-            overflow: auto;       /* вертикальный скролл при переполнении */
+            flex: 1;
+            overflow: auto;
             border: 1px solid #e0e0e0;
             padding: 8px;
             background: #fff;
@@ -54,13 +44,7 @@
         }
         th { background-color: #f2f2f2; position: relative; }
 
-        /* Chat — занимает 1 часть из 3, приклеен к низу */
-        .chat-pane {
-            flex: 1;
-            min-height: 0; /* важно для корректной работы overflow внутри */
-            display: flex;
-            flex-direction: column;
-        }
+        .chat-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
         .chat-inner {
             display: flex;
             flex-direction: column;
@@ -69,30 +53,25 @@
             background: #fafafa;
             padding: 8px;
             box-sizing: border-box;
-            overflow: hidden; /* чтобы контент не вылазил */
+            overflow: hidden;
         }
-
-        /* сообщения и область сообщений */
         #chatBox {
             flex: 1;
-            overflow-y: auto;  /* скроллим только сообщения */
-            min-height: 0;     /* важно, чтобы flex корректно сжимал */
+            overflow-y: auto;
+            min-height: 0;
             display: flex;
             flex-direction: column;
             gap: 6px;
             padding: 6px;
         }
-
         .chat-row {
             display: flex;
             align-items: flex-start;
             gap: 8px;
-            margin: 0;             /* минимальный внешний отступ, управляем через gap у #chatBox */
+            margin: 0;
         }
-
         .chat-row.user { justify-content: flex-end; }
         .chat-row.ai   { justify-content: flex-start; }
-
         .avatar {
             font-size: 18px;
             line-height: 1;
@@ -102,7 +81,6 @@
             justify-content: center;
             flex-shrink: 0;
         }
-
         .msg {
             max-width: 72%;
             padding: 10px;
@@ -113,48 +91,30 @@
             line-height: 1.2;
             font-size: 14px;
         }
-
-        .user .msg {
-            background: #e6e6e6;
-            text-align: right;
-        }
-        .ai .msg {
-            background: #ffffff;
-            border: 1px solid #eee;
-            text-align: left;
-        }
-
-        /* уменьшение отступов внутри Markdown-рендера */
+        .user .msg { background: #e6e6e6; text-align: right; }
+        .ai .msg   { background: #ffffff; border: 1px solid #eee; text-align: left; }
         .msg p { margin: 0 0 6px 0; }
         .msg h1, .msg h2, .msg h3 { margin: 0 0 6px 0; line-height: 1.2; }
         .msg ul, .msg ol { margin: 6px 0 6px 1.1em; padding-left: 0; }
         .msg li { margin: 3px 0; }
         .msg pre { margin: 0; padding: 8px; border-radius: 6px; background: #f5f5f7; overflow: auto; font-size: 13px; }
         .msg code { background: #f2f2f2; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
-
-        /* контролы ввода — остаются внизу chat-pane */
         .chat-controls {
             display: flex;
             gap: 8px;
             margin-top: 8px;
-            flex-shrink: 0;  /* чтобы панель ввода не схлопывалась */
+            flex-shrink: 0;
         }
         #chatInput { flex: 1; padding: 8px; font-size: 14px; }
         #sendBtn { padding: 8px 12px; }
-
-        /* индикатор "AI is typing" */
         #typingIndicator {
             font-style: italic;
             color: #666;
             font-size: 13px;
             margin: 4px 0;
-            padding-left: 32px; /* смещаем, чтобы было на месте аватарки 🤖 */
+            padding-left: 32px;
         }
-
-        /* адаптивность: при узком экране уменьшаем ширину пузырей */
-        @media (max-width: 600px) {
-            .msg { max-width: 85%; }
-        }
+        @media (max-width: 600px) { .msg { max-width: 85%; } }
     </style>
 </head>
 <body>
@@ -162,26 +122,24 @@
         <div class="pane tasks-pane">
             <h1 style="margin:0;">Task Manager</h1>
             <h2 style="margin:0 0 4px 0;">Tasks</h2>
-
             <div class="tasks-container">
                 <table id="tasksTable" aria-label="tasks table">
                     <thead>
                         <tr>
-                            <th>ID</th><th>Title</th><th>Description</th><th>Due Date</th>
-                            <th>Priority</th><th>Category</th><th>Status</th><th>Created At</th>
+                            <th>ID</th><th>Title</th><th>Description</th>
+                            <th>Due Date</th><th>Priority</th>
+                            <th>Category</th><th>Status</th><th>Created At</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
                 </table>
             </div>
         </div>
-
         <div class="pane chat-pane">
             <h2 style="margin:0 0 6px 0;">AI Chat</h2>
             <div class="chat-inner">
                 <div id="chatBox" aria-live="polite"></div>
                 <div id="typingIndicator" style="display:none;">🤖 AI is typing...</div>
-
                 <div class="chat-controls">
                     <input id="chatInput" type="text" placeholder="Type your message here">
                     <button id="sendBtn">Send</button>
@@ -192,7 +150,19 @@
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
-        // ===== Tasks table =====
+        // ===== Helper functions =====
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+        }
+        function formatDate(d) {
+            if (!d) return '';
+            const dt = new Date(d);
+            if (isNaN(dt)) return d;
+            return dt.toLocaleDateString() + ' ' + dt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        }
+        function formatDateTime(d) { return formatDate(d); }
+
+        // ===== Tasks =====
         async function loadTasks() {
             try {
                 const res = await fetch("http://127.0.0.1:8000/tasks");
@@ -202,28 +172,35 @@
 
                 tasks.forEach(task => {
                     const row = document.createElement("tr");
+
+                    const priorityValue = (task.priority || "").toLowerCase();
+                    if (priorityValue === "high" || priorityValue === "высокий") {
+                        row.style.backgroundColor = "#ffe5e5";
+                    } else if (priorityValue === "low" || priorityValue === "низкий") {
+                        row.style.color = "#999";
+                    }
+
+                    if (task.due_date) {
+                        const due = new Date(task.due_date);
+                        const now = new Date();
+                        if (due < now) {
+                            row.style.backgroundColor = "#fff0f0";
+                        }
+                    }
+
                     row.innerHTML = `
                         <td>${task.id}</td>
                         <td>${escapeHtml(task.title || '')}</td>
                         <td>${escapeHtml(task.description || '')}</td>
-                        <td>${task.due_date || ''}</td>
+                        <td>${formatDate(task.due_date)}</td>
                         <td>${task.priority || ''}</td>
                         <td>${task.category || ''}</td>
                         <td>${task.status || ''}</td>
-                        <td>${task.created_at || ''}</td>
+                        <td>${formatDateTime(task.created_at)}</td>
                     `;
                     tbody.appendChild(row);
                 });
-            } catch (err) {
-                console.log("Error loading tasks:", err);
-            }
-        }
-
-        // небольшой helper для защиты (на всякий случай)
-        function escapeHtml(s) {
-            return String(s).replace(/[&<>"']/g, function(m){
-                return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[m];
-            });
+            } catch (err) { console.log("Error loading tasks:", err); }
         }
 
         loadTasks();
@@ -235,7 +212,7 @@
         const sendBtn = document.getElementById("sendBtn");
 
         sendBtn.addEventListener("click", sendMessage);
-        chatInput.addEventListener("keypress", function(e) { if (e.key === "Enter") sendMessage(); });
+        chatInput.addEventListener("keypress", e => { if (e.key === "Enter") sendMessage(); });
 
         async function sendMessage() {
             const msg = chatInput.value.trim();
@@ -243,8 +220,6 @@
 
             appendMessage("user", msg);
             chatInput.value = "";
-
-            // показать индикатор
             document.getElementById("typingIndicator").style.display = "block";
 
             try {
@@ -254,10 +229,7 @@
                     body: JSON.stringify({ message: msg })
                 });
                 const data = await response.json();
-
-                // скрыть индикатор
                 document.getElementById("typingIndicator").style.display = "none";
-
                 appendMessage("ai", data.response);
             } catch (err) {
                 document.getElementById("typingIndicator").style.display = "none";
@@ -287,7 +259,6 @@
             }
 
             chatBox.appendChild(row);
-            // прокручиваем в конец
             chatBox.scrollTop = chatBox.scrollHeight;
         }
     </script>
