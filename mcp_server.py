@@ -8,7 +8,7 @@ import re
 # Init server
 mcp = FastMCP("TaskManager")
 
-# ===== НАСТРОЙКА ЛОГИРОВАНИЯ =====
+# ===== LOGGING SETTINGS =====
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -28,11 +28,21 @@ def get_db_connection():
     return conn
 
 
-
-
-logger = logging.getLogger(__name__)
-
 def parse_due_date(raw_due: str | None) -> str | None:
+    """
+    Преобразует текстовую дату в ISO-формат.
+
+    Функция пытается распознать дату и время из строки.
+    Если во входной строке указано время суток ("утром", "вечером", "night" и т.п.),
+    оно подставляется автоматически. Если время явно не указано, возвращается только дата.
+
+    Args:
+        raw_due (str | None): текстовое представление даты и/или времени.
+
+    Returns:
+        str | None: ISO-строка даты/времени, например "2025-09-18" или "2025-09-18T18:00:00".
+                    Возвращает None, если строку не удалось распознать.
+    """
     if not raw_due:
         return None
 
@@ -51,6 +61,7 @@ def parse_due_date(raw_due: str | None) -> str | None:
         "night": (23, 0),
     }
 
+    # Ищем в строке ключевые слова для времени суток, сохраняем их в переменную matched_time и чистим строку от слова, чтобы парсер мог распознать дату
     matched_time = None
     for word, (h, m) in time_overrides.items():
         if word in text:
@@ -58,6 +69,7 @@ def parse_due_date(raw_due: str | None) -> str | None:
             text = text.replace(word, "").strip()  # убираем слово, чтобы parser понял дату
             break
 
+    # Распознаём то, что осталось от даты (например, слова типа "завтра", "5 сентября")
     parsed = dateparser.parse(
         text,
         languages=["ru", "en"],
@@ -72,17 +84,17 @@ def parse_due_date(raw_due: str | None) -> str | None:
         logger.warning(f"Unrecognized due_date: {raw_due}")
         return None
 
-    # если нашли время суток → подставляем его вручную
+    # Если нашли время суток, подставляем его вручную
     if matched_time:
         parsed = parsed.replace(hour=matched_time[0], minute=matched_time[1])
         return parsed.isoformat()
 
-    # проверяем, было ли во входе время явно
+    # Проверяем, было ли указано во входе время явно
     time_pattern = r"\b\d{1,2}[:.]\d{2}\b"
     if re.search(time_pattern, raw_due):
         return parsed.isoformat()
 
-    # иначе возвращаем только дату
+    # Иначе возвращаем только дату
     return parsed.date().isoformat()
 
 
@@ -99,7 +111,28 @@ def add_task(
     started_at: str | None = None,
     completed_at: str | None = None
 ) -> dict:
-    """Add task with full support of fields"""
+    """
+    Добавляет новую задачу в базу данных.
+
+    Функция создаёт запись в таблице `tasks` с указанными полями, фильтруя пустые значения.
+    Поле `due_date` автоматически парсится через `parse_due_date`.
+    После добавления возвращается полная информация о созданной задаче.
+
+    Args:
+        title (str): заголовок задачи (обязательное поле, не может быть пустым)
+        description (str | None, optional): описание задачи
+        due_date (str | None, optional): срок выполнения в виде строки
+        priority_id (int | None, optional): идентификатор приоритета
+        category_id (int | None, optional): идентификатор категории
+        status_id (int | None, optional): идентификатор статуса
+        started_at (str | None, optional): дата начала задачи
+        completed_at (str | None, optional): дата завершения задачи
+
+    Returns:
+        dict: результат операции:
+            - {"status": "success", "data": {...}} — если задача успешно добавлена, содержит все поля новой задачи
+            - {"status": "error", "error": str} — если произошла ошибка (например, пустой заголовок или проблема с БД)
+    """
 
     try:
         if not title or not title.strip():
@@ -146,7 +179,19 @@ def add_task(
 
 @mcp.tool()
 def list_tasks():
-    """Return all tasks with all fields"""
+    """
+    Получает список всех задач из базы данных.
+
+    Функция выполняет запрос к таблице `tasks`, сортируя задачи по дате создания.
+    Возвращает список задач в виде словарей вместе с количеством найденных записей.
+
+    Returns:
+        dict: результат операции с полями:
+            - "status": "success" или "error"
+            - "tasks": список задач (каждая задача — словарь), присутствует только при успешном выполнении
+            - "count": количество найденных задач, присутствует только при успешном выполнении
+            - "message": текст ошибки, присутствует только при неудаче
+    """
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -162,9 +207,26 @@ def list_tasks():
         return {"status": "error", "message": "Failed to retrieve tasks"}
 
 
+
 @mcp.tool()
 def search_tasks(query: str):
-    """Search tasks by title or description"""
+    """
+    Выполняет поиск задач по тексту в заголовках и описаниях.
+
+    Функция ищет совпадения в таблице `tasks`, игнорируя регистр,
+    и возвращает список задач с расширенной информацией о приоритете, категории и статусе.
+
+    Args:
+        query (str): строка поиска. Не может быть пустой.
+
+    Returns:
+        dict: результат операции с полями:
+            - "status": "success" или "error"
+            - "tasks": список найденных задач (каждая задача — словарь с полями title, description, priority, category, status и др.)
+            - "count": количество найденных задач
+            - "query": использованная строка поиска
+            - "message": текст ошибки, присутствует только при неудаче
+    """
     try:
         if not query or not query.strip():
             logger.warning("Empty search query provided")
@@ -211,7 +273,31 @@ def search_tasks(query: str):
 @mcp.tool()
 def edit_task(search_query: str, title: str = None, description: str = None,
               priority: str = None, category: str = None, status: str = None, due_date: str = None):
-    """Edit task by search query. If multiple tasks found, returns list for clarification."""
+    """
+    Редактирует существующую задачу, найденную по строке поиска.
+
+    Функция ищет задачи, соответствующие `search_query`.
+    - Если задача не найдена — возвращает ошибку.
+    - Если найдено несколько задач — возвращает список и предлагает уточнить запрос.
+    - Если найдена одна задача — обновляет указанные поля и возвращает обновлённую запись.
+
+    Args:
+        search_query (str): строка для поиска задачи (обязательное поле)
+        title (str, optional): новый заголовок задачи
+        description (str, optional): новое описание задачи
+        priority (str, optional): новое название приоритета
+        category (str, optional): новое название категории
+        status (str, optional): новое название статуса
+        due_date (str, optional): новая дата выполнения (строка)
+
+    Returns:
+        dict: результат операции с возможными полями:
+            - "status": "success", "error" или "multiple_found"
+            - "message": текстовое описание результата или ошибки
+            - "task": обновлённая задача (при успешном обновлении одной задачи)
+            - "tasks": список задач (если найдено несколько совпадений)
+            - "count": количество найденных задач (если несколько совпадений)
+    """
     try:
         if not search_query or not search_query.strip():
             return {"status": "error", "message": "Search query cannot be empty"}
@@ -330,7 +416,20 @@ def edit_task(search_query: str, title: str = None, description: str = None,
 
 @mcp.tool()
 def delete_task(id: int):
-    """Delete task by ID"""
+    """
+    Удаляет задачу по её ID.
+
+    Функция проверяет корректность переданного ID, существование задачи и выполняет её удаление из таблицы `tasks`.
+
+    Args:
+        id (int): идентификатор задачи, которую нужно удалить. Должен быть положительным числом.
+
+    Returns:
+        dict: результат операции с полями:
+            - "status": "success" или "error"
+            - "message": текст сообщения о результате или ошибке
+            - "id": ID удалённой задачи (только при успешном удалении)
+    """
     try:
         # Валидация ID
         if not isinstance(id, int) or id <= 0:
@@ -358,7 +457,6 @@ def delete_task(id: int):
 
 
 def main():
-    """Main function with proper error handling"""
     try:
         logger.info("Starting MCP TaskManager server...")
 
