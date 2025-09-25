@@ -3,7 +3,8 @@ import sqlite3
 from typing import List, Dict
 from pydantic import BaseModel
 from fastapi.responses import FileResponse
-from mcp_client_llm import TaskManagerAgent, AgentConfig, ModelProvider  # твой существующий код агента
+from mcp_client import TaskManagerAgent
+from llm_provider import AgentConfig, ModelProvider
 from dotenv import load_dotenv
 
 load_dotenv()
