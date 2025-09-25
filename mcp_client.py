@@ -11,7 +11,8 @@ from langchain_core.messages import HumanMessage
 from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import InMemorySaver
 
-from llm_provider import AgentConfig, ModelFactory, ModelProvider
+from graph import build_graph
+from llm_provider import AgentConfig, ModelFactory, ModelProvider, LLMWrapper
 from task_utils import retry_on_failure
 
 # ==== ЛОГГИРОВАНИЕ ====
@@ -73,6 +74,9 @@ class TaskManagerAgent:
                 prompt=self._get_system_prompt()
             )
 
+            # Код для варианта с графом
+            # self.agent = build_graph(self.config)
+
             self._initialized = True
             logger.info("✅ Агент успешно инициализирован")
             return True
@@ -118,6 +122,15 @@ class TaskManagerAgent:
             response = await self.agent.ainvoke(message_input, config)
             # ожидаем структуру как в оригинале
             return response["messages"][-1].content
+
+
+            # Код для графа
+            # # Начальное состояние графа
+            # state = {"description": user_input}
+            # # Запускаем граф
+            # result = await self.agent.ainvoke(state)
+            # # Берём confirmation из финального состояния
+            # return result.get("confirmation", "⚠️ Не удалось сформировать подтверждение.")
 
         except Exception as e:
             error_msg = f"❌ Ошибка обработки: {e}"

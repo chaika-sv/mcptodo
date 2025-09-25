@@ -9,7 +9,22 @@ from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 from langchain_deepseek import ChatDeepSeek
 
+from mcp_client_llm import AgentConfig
+
 logger = logging.getLogger(__name__)
+
+
+class LLMWrapper:
+    """Единый интерфейс для вызова LLM в узлах графа."""
+
+    def __init__(self, config: AgentConfig):
+        self.model = ModelFactory.create_model(config)
+
+    async def call(self, prompt: str) -> str:
+        """Асинхронный вызов модели с текстовым промптом."""
+        response = await self.model.ainvoke(prompt)
+        return response.content.strip()
+
 
 
 class ModelProvider(Enum):
@@ -22,9 +37,7 @@ class ModelProvider(Enum):
 
 @dataclass
 class AgentConfig:
-    """
-    Конфигурация агента — хранит настройки моделей и общие флаги.
-    """
+    """Конфигурация агента — хранит настройки моделей и общие флаги."""
     model_provider: ModelProvider = ModelProvider.OPENROUTER
     use_memory: bool = True
 
@@ -63,9 +76,7 @@ class AgentConfig:
             raise ValueError(f"Отсутствует переменная окружения: {api_key_env}")
 
     def get_mcp_config(self) -> Dict[str, Any]:
-        """
-        Возвращает конфиг для MultiServerMCPClient.
-        """
+        """Возвращает конфиг для MultiServerMCPClient."""
         return {
             "taskmanager": {
                 "command": "python",
